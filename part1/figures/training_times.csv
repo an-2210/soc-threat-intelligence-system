@@ -1,0 +1,3 @@
+model,train_seconds,settings
+Random Forest,82,"100 trees, balanced_subsample"
+HistGradientBoosting,20,"200 iterations, depth 8, lr 0.1, balanced"
