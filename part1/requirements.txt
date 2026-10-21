@@ -1,8 +1,8 @@
-pandas
-numpy
-scikit-learn
-joblib
-requests
-matplotlib
-seaborn
-jupyterlab
+joblib==1.6.0
+jupyterlab==4.6.4
+matplotlib==3.11.2
+numpy==2.4.6
+pandas==3.0.6
+requests==2.34.2
+scikit-learn==1.9.1
+seaborn==0.13.2

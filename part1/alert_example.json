@@ -1,0 +1,1 @@
+{"timestamp": "2026-10-21T06:10:51Z", "source": "part1", "src_ip": "192.0.2.55", "dst_ip": "192.168.10.5", "dst_port": 5200, "label": "PortScan", "confidence": 1.0, "top_features": {"Bwd Packets/s": 125000.0, "Destination Port": 5200.0, "Avg Bwd Segment Size": 6.0}}
