@@ -13,10 +13,9 @@ model, FEATURES = bundle["model"], bundle["features"]
 MEAN, STD = bundle["mean"], bundle["std"]
 IMPORTANCE = dict(zip(FEATURES, model.feature_importances_))
 
-# Demo only: the dataset has no IPs, so we simulate them.
-ATTACKERS = {"BruteForce": ["203.0.113.10", "203.0.113.11"],
-             "DoS": ["198.51.100.7"],
-             "PortScan": ["192.0.2.55"]}
+# Demo only: the dataset has no IPs, so sources are random placeholders.
+# They never depend on the true label, so the alert stream carries no information about the answer.
+SIMULATED_SOURCES = ["203.0.113.10", "203.0.113.11", "198.51.100.7", "192.0.2.55", "10.0.0.5", "10.0.0.23"]
 
 
 def explain(row, k=3):
@@ -54,12 +53,8 @@ def send(alert, url, post):
         print("Could not reach dashboard:", e)
 
 
-def make_meta(row, true_label):
-    if true_label in ATTACKERS:
-        src = random.choice(ATTACKERS[true_label])
-    else:
-        src = f"10.0.0.{random.randint(2, 50)}"
-    return {"src_ip": src, "dst_ip": "192.168.10.5", "dst_port": int(row["Destination Port"])}
+def make_meta(row):
+    return {"src_ip": random.choice(SIMULATED_SOURCES), "dst_ip": "192.168.10.5", "dst_port": int(row["Destination Port"])}
 
 
 def detect(flows, metas, url=URL, post=False, delay=0.0):
@@ -86,6 +81,8 @@ if __name__ == "__main__":
     a = ap.parse_args()
 
     df = pd.read_csv(a.flows)
-    true = df["true_label"] if "true_label" in df else pd.Series([None] * len(df))
-    metas = [make_meta(df.iloc[i], true.iloc[i]) for i in range(len(df))]
+    metas = [make_meta(df.iloc[i]) for i in range(len(df))]
     detect(df, metas, url=a.url, post=a.send, delay=a.delay)
+    if "true_label" in df:  # evaluation only; the alerts above never see the label
+        pred = model.predict(df[FEATURES])
+        print(f"accuracy on {a.flows}: {(pred == df['true_label']).mean():.4f} ({len(df)} flows)")

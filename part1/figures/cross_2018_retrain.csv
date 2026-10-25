@@ -1,0 +1,13 @@
+model,2017 test accuracy,2017 test macro F1,2018 holdout accuracy,2018 class,n,correct %
+2017 only (current),0.9994,0.9994,0.4979,,,
+2017 only (current),,,,Benign,30000.0,98.14
+2017 only (current),,,,DoS attacks-Hulk,15000.0,2.95
+2017 only (current),,,,DoS attacks-SlowHTTPTest,17.0,0.0
+2017 only (current),,,,FTP-BruteForce,16.0,0.0
+2017 only (current),,,,SSH-Bruteforce,15000.0,0.02
+2017 + 2018 train,0.9994,0.9993,0.9995,,,
+2017 + 2018 train,,,,Benign,30000.0,99.98
+2017 + 2018 train,,,,DoS attacks-Hulk,15000.0,100.0
+2017 + 2018 train,,,,DoS attacks-SlowHTTPTest,17.0,5.88
+2017 + 2018 train,,,,FTP-BruteForce,16.0,37.5
+2017 + 2018 train,,,,SSH-Bruteforce,15000.0,99.99
