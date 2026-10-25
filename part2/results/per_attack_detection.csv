@@ -1,0 +1,15 @@
+attack,test_rows,iforest_detection_rate,iforest_roc_auc,autoencoder_detection_rate,autoencoder_roc_auc
+DoS Hulk,230124,0.0016,0.8305,0.6171,0.9012
+PortScan,158804,0.0008,0.7175,0.2172,0.9448
+DDoS,128025,0.0,0.9131,0.8503,0.994
+DoS GoldenEye,10293,0.0008,0.8729,0.274,0.9565
+FTP-Patator,7935,0.0,0.821,0.0063,0.9192
+SSH-Patator,5897,0.0,0.6378,0.002,0.7478
+DoS slowloris,5796,0.2509,0.9301,0.6884,0.9928
+DoS Slowhttptest,5499,0.5497,0.9765,0.4159,0.9902
+Bot,1956,0.0,0.6816,0.0158,0.7135
+Web Attack - Brute Force,1507,0.0,0.8493,0.0,0.8755
+Web Attack - XSS,652,0.0,0.8806,0.0,0.8985
+Infiltration,36,0.6389,0.9516,0.8611,0.9765
+Web Attack - Sql Injection,21,0.0,0.6345,0.0,0.7711
+Heartbleed,11,1.0,0.9968,1.0,0.9975

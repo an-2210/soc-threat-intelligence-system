@@ -1,0 +1,5 @@
+split,rows
+benign_train,1589924
+benign_validation,340698
+benign_test,340698
+attacks_test_only,556556

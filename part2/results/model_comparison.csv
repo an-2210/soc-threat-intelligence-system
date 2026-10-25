@@ -1,0 +1,3 @@
+model,threshold,validation_fpr,test_fpr,roc_auc,attack_detection_rate,train_seconds
+iforest,0.619854,0.01,0.0104,0.8179,0.009,1.0
+autoencoder,0.057128,0.01,0.01,0.9358,0.5293,101.7
