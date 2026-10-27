@@ -24,10 +24,10 @@ The SOC dashboard has been modernized into a high-performance **React.js + Vite*
 - `db.py`: SQLite persistence layer storing alert telemetry and metadata.
 - `correlation.py`: Multi-stage attack correlation engine clustering alerts by IP and time window.
 - `security_check.py`: RFC address classification and deep IP history analysis heuristics.
-- `report_generator.py`: AI Incident Report Engine (What, Evidence, Severity, Action) + ReportLab PDF Exporter.
+- `report_generator.py`: AI Incident Report Engine (Tri-Engine: Local Ollama, Google Gemini, and Heuristic Fallback) + ReportLab PDF Exporter.
 - `dashboard.py`: Streamlit legacy dashboard (preserved for backwards compatibility).
-- `mock_alerts.py`: Testing CLI simulating reconnaissance, brute force, DoS, and zero-day anomaly bursts.
-- `tests/test_soc_cti.py`: Pytest suite with 25 unit and end-to-end integration tests.
+- `mock_alerts.py`: Testing CLI simulating reconnaissance, brute force, DoS, and zero-day anomaly bursts (supports `--src-ip`).
+- `tests/test_soc_cti.py`: Pytest suite with 30 unit and end-to-end integration tests (100% passing).
 
 ---
 
