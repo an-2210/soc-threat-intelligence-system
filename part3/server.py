@@ -70,6 +70,9 @@ class AlertPayload(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence or percentile score (0.0 to 1.0)")
     top_features: Dict[str, Any] = Field(default_factory=dict, description="Top anomalous feature contributions")
     is_synthetic: bool = Field(default=False, description="True if alert was generated synthetically by mock tools")
+    src_port: Optional[int] = Field(default=None, description="Optional source port")
+    protocol: Optional[str] = Field(default=None, description="Optional network protocol")
+    severity: Optional[str] = Field(default=None, description="Optional severity indicator")
 
     @field_validator("timestamp")
     @classmethod
@@ -100,6 +103,7 @@ def health():
 
 
 @app.post("/alert", status_code=status.HTTP_200_OK)
+@app.post("/alerts", status_code=status.HTTP_200_OK)
 def receive_alert(alert: AlertPayload, allow_duplicate: bool = Query(False)):
     try:
         alert_dict = alert.model_dump() if hasattr(alert, "model_dump") else alert.dict()

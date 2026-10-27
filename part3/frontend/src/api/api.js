@@ -45,7 +45,7 @@ export const api = {
   },
 
   postAlert: async (alertData) => {
-    const res = await client.post('/alerts', alertData);
+    const res = await client.post('/alert', alertData);
     return res.data;
   },
 
