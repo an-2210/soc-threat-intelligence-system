@@ -38,10 +38,12 @@ from part3.db import (
     insert_alert,
 )
 from part3.report_generator import (
+    check_ollama_status,
     export_report_to_pdf,
     generate_heuristic_report,
     generate_incident_report,
     generate_llm_report_with_gemini,
+    generate_llm_report_with_ollama,
     parse_llm_markdown_sections,
 )
 from part3.server import app
@@ -393,6 +395,120 @@ def test_report_generation_gemini_failure_triggers_fallback():
         assert "QuotaExceeded" in report["metadata"]["error_category"]
         assert "what" in report
         assert "action" in report
+
+
+def test_ollama_status_offline():
+    """Ensure check_ollama_status handles unreachable local host gracefully."""
+    with mock.patch("urllib.request.urlopen", side_effect=OSError("Connection refused")):
+        status = check_ollama_status("http://127.0.0.1:11434")
+        assert status["available"] is False
+        assert status["models"] == []
+        assert status["default_model"] is None
+        assert "refused" in status["error"].lower() or status["error"] is not None
+
+
+def test_ollama_status_online_mocked():
+    """Ensure check_ollama_status parses installed models correctly."""
+    mock_response = mock.MagicMock()
+    mock_response.status = 200
+    mock_response.read.return_value = json.dumps({
+        "models": [
+            {"name": "mistral:latest"},
+            {"name": "llama3:latest"},
+            {"name": "phi3:latest"},
+        ]
+    }).encode("utf-8")
+    mock_response.__enter__.return_value = mock_response
+
+    with mock.patch("urllib.request.urlopen", return_value=mock_response):
+        status = check_ollama_status("http://127.0.0.1:11434")
+        assert status["available"] is True
+        assert "llama3:latest" in status["models"]
+        # Preferred order prefers llama3 over mistral/phi3
+        assert status["default_model"] == "llama3:latest"
+
+
+def test_report_generation_with_ollama_mocked():
+    """Ensure generate_llm_report_with_ollama parses model output into structured sections."""
+    incident = {
+        "incident_id": "INC-0001",
+        "src_ip": "198.51.100.45",
+        "target_ips": ["192.168.10.5"],
+        "target_ports": [22],
+        "first_seen": "2026-10-25T10:00:00Z",
+        "last_seen": "2026-10-25T10:02:00Z",
+        "duration_seconds": 120,
+        "alert_count": 5,
+        "labels": ["BruteForce"],
+        "label_breakdown": {"BruteForce": 5},
+        "sources": ["part1"],
+        "max_confidence": 0.99,
+        "severity": "HIGH",
+        "risk_score": 7.5,
+        "scoring_rationale": "High score",
+        "threat_pattern": "Brute force sequence",
+        "is_synthetic": False,
+        "alerts": [],
+    }
+
+    mock_ollama_output = """### WHAT HAPPENED
+Ollama observed systematic SSH brute-force attempts from 198.51.100.45 targeting 192.168.10.5.
+
+### EVIDENCE
+5 anomalous flows detected by Random Forest model with 0.99 confidence on port 22.
+
+### SEVERITY
+HIGH. Service credentials are under attack.
+
+### RECOMMENDED ACTION
+iptables -I INPUT -s 198.51.100.45 -j DROP
+Audit auth.log immediately."""
+
+    mock_response = mock.MagicMock()
+    mock_response.status = 200
+    mock_response.read.return_value = json.dumps({"response": mock_ollama_output}).encode("utf-8")
+    mock_response.__enter__.return_value = mock_response
+
+    with mock.patch("urllib.request.urlopen", return_value=mock_response):
+        sections, meta = generate_llm_report_with_ollama(incident, model="llama3")
+        assert "SSH brute-force" in sections["what"]
+        assert "port 22" in sections["evidence"]
+        assert "HIGH" in sections["severity"]
+        assert "iptables" in sections["action"]
+        assert meta["generator"] == "ollama/llama3"
+        assert meta["fallback_used"] is False
+
+
+def test_report_generation_ollama_failure_triggers_fallback():
+    """Ensure generate_incident_report falls back to heuristic if Ollama errors out."""
+    incident = {
+        "incident_id": "INC-0001",
+        "src_ip": "198.51.100.45",
+        "target_ips": ["192.168.10.5"],
+        "target_ports": [22],
+        "first_seen": "2026-10-25T10:00:00Z",
+        "last_seen": "2026-10-25T10:02:00Z",
+        "duration_seconds": 120,
+        "alert_count": 5,
+        "labels": ["BruteForce"],
+        "label_breakdown": {"BruteForce": 5},
+        "sources": ["part1"],
+        "max_confidence": 0.99,
+        "severity": "HIGH",
+        "risk_score": 7.5,
+        "scoring_rationale": "High score",
+        "threat_pattern": "Brute force sequence",
+        "is_synthetic": False,
+        "alerts": [],
+    }
+
+    with mock.patch("part3.report_generator.generate_llm_report_with_ollama", side_effect=RuntimeError("Ollama timeout")):
+        report = generate_incident_report(incident, engine="ollama")
+        assert report["metadata"]["fallback_used"] is True
+        assert "Ollama timeout" in report["metadata"]["error_category"]
+        assert "what" in report
+        assert "action" in report
+
 
 
 def test_markdown_section_parser_robustness():
@@ -823,6 +939,52 @@ def test_api_new_endpoints_for_react_frontend(api_client, isolated_test_db):
     assert r_pdf.status_code == 200
     assert r_pdf.content.startswith(b"%PDF")
     assert "Content-Disposition" in r_pdf.headers
+
+
+def test_api_llm_status_and_report_with_engine(api_client, isolated_test_db):
+    """Verify /llm/status endpoint and report generation with engine query parameter."""
+    # Ingest test alert
+    api_client.post("/alert", json={
+        "timestamp": "2026-10-25T14:00:00Z",
+        "source": "part1",
+        "src_ip": "198.51.100.77",
+        "dst_ip": "192.168.10.5",
+        "dst_port": 80,
+        "label": "DoS",
+        "confidence": 0.99,
+        "is_synthetic": False,
+    })
+
+    # Test /llm/status
+    r_status = api_client.get("/llm/status")
+    assert r_status.status_code == 200
+    status_data = r_status.json()
+    assert "active_default" in status_data
+    assert "ollama" in status_data
+    assert "gemini" in status_data
+    assert "available" in status_data["ollama"]
+
+    # Retrieve incident ID
+    r_inc = api_client.get("/incidents")
+    assert r_inc.status_code == 200
+    inc_id = r_inc.json()[0]["incident_id"]
+
+    # Test report with explicit heuristic engine
+    r_rep = api_client.post(f"/incidents/{inc_id}/report?engine=heuristic")
+    assert r_rep.status_code == 200
+    rep_data = r_rep.json()
+    assert rep_data["metadata"]["generator"] == "Deterministic SOC Analyst Engine (Offline)"
+    assert rep_data["metadata"]["fallback_used"] is False
+
+    # Test report with explicit ollama engine (mocked)
+    with mock.patch("part3.report_generator.generate_llm_report_with_ollama", return_value=(
+        {"what": "Ollama What", "evidence": "Ollama Evidence", "severity": "HIGH", "action": "Block"},
+        {"generator": "ollama/llama3", "model": "llama3", "fallback_used": False, "error_category": None, "risk_score": 7.0, "is_synthetic": False}
+    )):
+        r_ollama = api_client.post(f"/incidents/{inc_id}/report?engine=ollama&model=llama3")
+        assert r_ollama.status_code == 200
+        assert r_ollama.json()["metadata"]["generator"] == "ollama/llama3"
+
 
 
 

@@ -80,17 +80,27 @@ export const api = {
     return res.data;
   },
 
+  // LLM Status & Configuration
+  getLLMStatus: async () => {
+    const res = await client.get('/llm/status');
+    return res.data;
+  },
+
   // Reports & PDF
-  generateReport: async (incidentId, windowMinutes = 15) => {
+  generateReport: async (incidentId, windowMinutes = 15, engine = 'auto', model = null) => {
+    const params = { time_window_minutes: windowMinutes, engine };
+    if (model) params.model = model;
     const res = await client.post(`/incidents/${encodeURIComponent(incidentId)}/report`, null, {
-      params: { time_window_minutes: windowMinutes },
+      params,
     });
     return res.data;
   },
 
-  downloadPdfBlob: async (incidentId, windowMinutes = 15) => {
+  downloadPdfBlob: async (incidentId, windowMinutes = 15, engine = 'auto', model = null) => {
+    const params = { time_window_minutes: windowMinutes, engine };
+    if (model) params.model = model;
     const res = await client.get(`/incidents/${encodeURIComponent(incidentId)}/pdf`, {
-      params: { time_window_minutes: windowMinutes },
+      params,
       responseType: 'blob',
     });
     return res.data;

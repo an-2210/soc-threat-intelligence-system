@@ -11,6 +11,13 @@ import {
   Printer,
   Sparkles,
   Layers,
+  Cpu,
+  Server,
+  Terminal,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import api from '../api/api';
 import SeverityBadge from '../components/SeverityBadge';
@@ -25,12 +32,35 @@ export const Reports = ({ timeWindow }) => {
   );
   const [loadingIncidents, setLoadingIncidents] = useState(true);
 
+  // LLM Engine selection & status
+  const [llmStatus, setLlmStatus] = useState(null);
+  const [selectedEngine, setSelectedEngine] = useState('auto'); // auto, ollama, gemini, heuristic
+  const [selectedModel, setSelectedModel] = useState('');
+  const [showOllamaGuide, setShowOllamaGuide] = useState(false);
+
   const [generatingReport, setGeneratingReport] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [reportError, setReportError] = useState(null);
 
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [copiedSection, setCopiedSection] = useState(null);
+
+  // Load LLM status
+  const loadLlmStatus = async () => {
+    try {
+      const status = await api.getLLMStatus();
+      setLlmStatus(status);
+      if (status.ollama?.default_model && !selectedModel) {
+        setSelectedModel(status.ollama.default_model);
+      }
+    } catch (err) {
+      console.warn('Failed to load LLM status:', err);
+    }
+  };
+
+  useEffect(() => {
+    loadLlmStatus();
+  }, []);
 
   // Load available incidents
   useEffect(() => {
@@ -54,18 +84,20 @@ export const Reports = ({ timeWindow }) => {
   // When selectedIncidentId changes, trigger report generation
   useEffect(() => {
     if (selectedIncidentId) {
-      handleGenerateReport(selectedIncidentId);
+      handleGenerateReport(selectedIncidentId, selectedEngine, selectedModel);
     }
   }, [selectedIncidentId]);
 
-  const handleGenerateReport = async (incId) => {
+  const handleGenerateReport = async (incId, engine = selectedEngine, model = selectedModel) => {
     const id = incId || selectedIncidentId;
     if (!id) return;
     try {
       setGeneratingReport(true);
       setReportError(null);
-      const res = await api.generateReport(id, timeWindow);
+      const res = await api.generateReport(id, timeWindow, engine, model || undefined);
       setReportData(res);
+      // Refresh LLM status in background
+      loadLlmStatus();
     } catch (err) {
       console.error('Failed to generate report:', err);
       setReportError(err.response?.data?.detail || err.message || 'Error generating report');
@@ -78,7 +110,7 @@ export const Reports = ({ timeWindow }) => {
     if (!selectedIncidentId) return;
     try {
       setDownloadingPdf(true);
-      const blob = await api.downloadPdfBlob(selectedIncidentId, timeWindow);
+      const blob = await api.downloadPdfBlob(selectedIncidentId, timeWindow, selectedEngine, selectedModel || undefined);
       const url = window.URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }));
       const link = document.createElement('a');
       link.href = url;
@@ -102,6 +134,88 @@ export const Reports = ({ timeWindow }) => {
 
   const currentIncident = incidents.find((i) => i.incident_id === selectedIncidentId);
 
+  // Render generator badge
+  const renderGeneratorBadge = () => {
+    const gen = reportData?.metadata?.generator || '';
+    const fallback = reportData?.metadata?.fallback_used;
+
+    if (gen.toLowerCase().includes('ollama')) {
+      const modelName = reportData?.metadata?.model || gen.replace('ollama/', '');
+      return (
+        <span
+          className="badge"
+          style={{
+            backgroundColor: 'rgba(6, 182, 212, 0.15)',
+            color: '#06b6d4',
+            border: '1px solid rgba(6, 182, 212, 0.4)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.75rem',
+            padding: '4px 8px',
+          }}
+        >
+          <Cpu size={13} />
+          <span>Local Ollama ({modelName})</span>
+        </span>
+      );
+    }
+
+    if (gen.toLowerCase().includes('gemini')) {
+      return (
+        <span
+          className="badge"
+          style={{
+            backgroundColor: 'rgba(59, 130, 246, 0.15)',
+            color: '#60a5fa',
+            border: '1px solid rgba(59, 130, 246, 0.4)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '0.75rem',
+            padding: '4px 8px',
+          }}
+        >
+          <Sparkles size={13} />
+          <span>Google Gemini (1.5-flash)</span>
+        </span>
+      );
+    }
+
+    return (
+      <span
+        className="badge"
+        style={{
+          backgroundColor: 'rgba(100, 116, 139, 0.15)',
+          color: '#94a3b8',
+          border: '1px solid rgba(100, 116, 139, 0.4)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontSize: '0.75rem',
+          padding: '4px 8px',
+        }}
+      >
+        <Shield size={13} />
+        <span>Deterministic SOC Heuristic Engine</span>
+        {fallback && (
+          <span
+            style={{
+              marginLeft: '4px',
+              fontSize: '0.65rem',
+              color: '#f59e0b',
+              backgroundColor: 'rgba(245, 158, 11, 0.15)',
+              padding: '1px 5px',
+              borderRadius: '3px',
+            }}
+          >
+            (Fallback)
+          </span>
+        )}
+      </span>
+    );
+  };
+
   return (
     <div className="page-wrapper">
       {/* Top Selector Panel */}
@@ -109,7 +223,7 @@ export const Reports = ({ timeWindow }) => {
         className="soc-card"
         style={{
           padding: '20px 24px',
-          marginBottom: '24px',
+          marginBottom: '16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -117,7 +231,7 @@ export const Reports = ({ timeWindow }) => {
           gap: '16px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
           <div>
             <div className="soc-card-title">
               <FileText size={18} color="var(--dell-blue-light)" />
@@ -128,8 +242,9 @@ export const Reports = ({ timeWindow }) => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Target Incident:</span>
+          {/* Incident Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Target:</span>
             <select
               className="form-select font-mono"
               style={{ width: '220px', padding: '7px 12px', fontSize: '0.85rem', fontWeight: 600 }}
@@ -144,6 +259,57 @@ export const Reports = ({ timeWindow }) => {
               ))}
             </select>
           </div>
+
+          {/* LLM Engine Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Engine:</span>
+            <select
+              className="form-select"
+              style={{ width: '210px', padding: '7px 12px', fontSize: '0.85rem' }}
+              value={selectedEngine}
+              onChange={(e) => {
+                const newEng = e.target.value;
+                setSelectedEngine(newEng);
+                handleGenerateReport(selectedIncidentId, newEng, selectedModel);
+              }}
+            >
+              <option value="auto">
+                Auto (Best Available)
+              </option>
+              <option value="ollama">
+                Ollama Local LLM {llmStatus?.ollama?.available ? '✓' : '(Offline)'}
+              </option>
+              <option value="gemini">
+                Google Gemini {llmStatus?.gemini?.available ? '✓' : '(No Key)'}
+              </option>
+              <option value="heuristic">Deterministic Offline Engine</option>
+            </select>
+          </div>
+
+          {/* Ollama Model Selector if available */}
+          {llmStatus?.ollama?.available && llmStatus?.ollama?.models?.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Model:</span>
+              <select
+                className="form-select font-mono"
+                style={{ width: '160px', padding: '7px 12px', fontSize: '0.82rem' }}
+                value={selectedModel}
+                onChange={(e) => {
+                  const m = e.target.value;
+                  setSelectedModel(m);
+                  if (selectedEngine === 'ollama') {
+                    handleGenerateReport(selectedIncidentId, 'ollama', m);
+                  }
+                }}
+              >
+                {llmStatus.ollama.models.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -151,6 +317,7 @@ export const Reports = ({ timeWindow }) => {
             className="btn btn-secondary"
             onClick={() => handleGenerateReport()}
             disabled={generatingReport || !selectedIncidentId}
+            title="Re-run synthesis with chosen engine"
           >
             <Sparkles size={15} color="var(--dell-blue-light)" />
             <span>{generatingReport ? 'Analyzing...' : 'Regenerate Analysis'}</span>
@@ -166,6 +333,66 @@ export const Reports = ({ timeWindow }) => {
           </button>
         </div>
       </div>
+
+      {/* Ollama Setup / Status Callout */}
+      {!llmStatus?.ollama?.available && (
+        <div
+          className="soc-card"
+          style={{
+            padding: '12px 18px',
+            marginBottom: '20px',
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            border: '1px dashed var(--border-color)',
+            borderRadius: '6px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Cpu size={16} color="#06b6d4" />
+              <span style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+                <strong>Want to use local private AI?</strong> Run{' '}
+                <code style={{ color: '#38bdf8', backgroundColor: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>
+                  ollama run llama3
+                </code>{' '}
+                on your system — the dashboard will auto-detect it without restarts.
+              </span>
+            </div>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => setShowOllamaGuide(!showOllamaGuide)}
+              style={{ fontSize: '0.72rem', padding: '3px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <Terminal size={12} />
+              <span>{showOllamaGuide ? 'Hide Guide' : 'Ollama Quickstart'}</span>
+              {showOllamaGuide ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            </button>
+          </div>
+
+          {showOllamaGuide && (
+            <div style={{ marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.08)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+              <ol style={{ paddingLeft: '20px', lineHeight: 1.8, margin: 0 }}>
+                <li>
+                  Download and install Ollama from{' '}
+                  <a href="https://ollama.com" target="_blank" rel="noreferrer" style={{ color: 'var(--dell-blue-light)', textDecoration: 'underline' }}>
+                    ollama.com
+                  </a>
+                  .
+                </li>
+                <li>
+                  Open your terminal / PowerShell and pull any model:
+                  <div style={{ backgroundColor: 'rgba(0,0,0,0.4)', padding: '6px 12px', borderRadius: '4px', fontFamily: 'var(--font-mono)', color: '#38bdf8', margin: '6px 0' }}>
+                    ollama run llama3
+                    <span style={{ color: 'var(--text-muted)', marginLeft: '12px' }}># or: ollama run llama3.2 / mistral / phi3</span>
+                  </div>
+                </li>
+                <li>
+                  Click <strong>Regenerate Analysis</strong> above. The dashboard will automatically route report synthesis to your local Ollama engine with zero cloud leakage.
+                </li>
+              </ol>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Main Report View */}
       {generatingReport ? (
@@ -203,9 +430,7 @@ export const Reports = ({ timeWindow }) => {
               </div>
 
               <div style={{ textAlign: 'right' }}>
-                <span className="badge badge-info" style={{ fontSize: '0.72rem' }}>
-                  Local Deterministic SOC Heuristic Engine
-                </span>
+                <div>{renderGeneratorBadge()}</div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                   Report Generated: {new Date().toLocaleTimeString()}
                 </div>

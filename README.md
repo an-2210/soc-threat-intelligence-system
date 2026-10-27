@@ -93,7 +93,7 @@ cnproj/
     │   └── public/                    # Favicon and static assets
     │
     └── tests/
-        └── test_soc_cti.py            # Comprehensive 25-test pytest suite
+        └── test_soc_cti.py            # Comprehensive 30-test pytest suite
 ```
 
 ---
@@ -124,13 +124,17 @@ cnproj/
   - Ingests raw unstructured text logs (SSH auth logs, Cisco ASA firewall drops, Nginx/Apache WAF logs).
   - Automatically extracts IOCs and supports one-click ingestion directly into the database.
 
-### 3. Forensic Executive Incident Reports & PDF Export
+### 3. Forensic Executive Incident Reports & Tri-Engine AI Synthesis
 - Generates 4 comprehensive sections for every correlated incident:
   1. **Executive Summary & Attack Nature** ("What Happened")
   2. **Observed Forensic Telemetry & Evidence** ("Evidence Analysis")
   3. **Threat Severity & Impact Assessment** ("Severity Rating")
   4. **Prescribed Containment & Remediation Roadmap** ("Action Plan")
-- Operates 100% offline using a built-in deterministic cybersecurity heuristic engine (or optionally via Google Gemini API).
+- **Flexible Tri-Engine Architecture**:
+  - **Local Ollama (Recommended / Fully Private)**: Connects to local Ollama server (`http://localhost:11434`) with auto-discovery of models (`llama3`, `llama3.2`, `mistral`, `phi3`, `qwen2.5`). Zero data leakage outside your network.
+  - **Google Gemini**: Cloud synthesis via `gemini-1.5-flash` (requires `GEMINI_API_KEY`).
+  - **Deterministic SOC Analyst Heuristic Engine**: Zero-dependency offline rule-based heuristic engine guaranteeing fast, hallucination-free output.
+- **Dynamic Engine Switching**: Switch between Auto, Ollama, Gemini, or Heuristic directly from the UI dropdown.
 - Exports executive-ready PDF deliverables compiled on the fly using ReportLab.
 
 ---
@@ -173,7 +177,7 @@ Run the complete automated test suite covering API contracts, deduplication, tem
 pytest part3/tests/test_soc_cti.py -v
 ```
 
-All 25 unit and integration tests pass cleanly:
+All 30 unit and integration tests pass cleanly:
 - `test_api_health`: API status and DB connectivity
 - `test_api_ingest_valid_alert`: Alert ingestion pipeline
 - `test_api_deduplication`: Duplicate signature suppression
@@ -188,6 +192,10 @@ All 25 unit and integration tests pass cleanly:
 - `test_correlation_synthetic_tagging`: Synthetic alert tagging
 - `test_report_generation_no_key_uses_heuristic`: Offline report fallback
 - `test_report_generation_gemini_failure_triggers_fallback`: LLM error recovery
+- `test_ollama_status_offline`: Graceful offline detection when Ollama is not running
+- `test_ollama_status_online_mocked`: Model listing and default selection from local Ollama tags API
+- `test_report_generation_with_ollama_mocked`: Local Ollama 4-section synthesis
+- `test_report_generation_ollama_failure_triggers_fallback`: Graceful fallback to heuristic on Ollama network failure
 - `test_markdown_section_parser_robustness`: 4-section report parser
 - `test_pdf_export_validity`: ReportLab binary PDF compilation
 - `test_pdf_export_xml_escaping_special_characters`: XML safe escaping
@@ -199,6 +207,7 @@ All 25 unit and integration tests pass cleanly:
 - `test_security_check_mode_a_target_filter_omitted_vs_specified`: Target filter semantics
 - `test_security_check_mode_a_correlated_incident_and_risk_reconciliation`: Incident reconciliation
 - `test_api_new_endpoints_for_react_frontend`: REST endpoints serving the React frontend
+- `test_api_llm_status_and_report_with_engine`: Live `/llm/status` probe and multi-engine report generation
 
 ---
 
@@ -207,6 +216,7 @@ All 25 unit and integration tests pass cleanly:
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/health` | Service health status and database connectivity |
+| `GET` | `/llm/status` | Active LLM detection (Ollama availability, model lists, Gemini status) |
 | `GET` | `/stats` | Basic telemetry counts and label distributions |
 | `GET` | `/stats/overview?time_window_minutes=15` | Aggregated dashboard bundle (KPIs, top destinations, incident severity) |
 | `GET` | `/alerts` | Paginated alert telemetry feed with multi-parameter filtering |

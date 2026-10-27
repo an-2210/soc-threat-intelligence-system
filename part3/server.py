@@ -25,7 +25,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from part3.db import clear_alerts, get_alerts, get_alerts_count, get_stats, init_db, insert_alert
 from part3.correlation import correlate_alerts
 from part3.security_check import analyze_ip_local, parse_network_log, submit_structured_alert
-from part3.report_generator import generate_incident_report, export_report_to_pdf
+from part3.report_generator import generate_incident_report, export_report_to_pdf, check_ollama_status
 
 from contextlib import asynccontextmanager
 
@@ -258,29 +258,63 @@ def api_parse_log(req: LogParseRequest):
     return res
 
 
+@app.get("/llm/status")
+def api_llm_status():
+    """Inspect availability of local Ollama instance and Google Gemini API."""
+    import os
+    ollama_info = check_ollama_status()
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    gemini_available = bool(gemini_key and gemini_key.strip())
+
+    active_default = "heuristic"
+    if ollama_info.get("available"):
+        active_default = "ollama"
+    elif gemini_available:
+        active_default = "gemini"
+
+    return {
+        "active_default": active_default,
+        "ollama": ollama_info,
+        "gemini": {
+            "available": gemini_available,
+            "model": "gemini-1.5-flash",
+        },
+    }
+
+
 @app.post("/incidents/{incident_id}/report")
-def api_generate_report(incident_id: str, time_window_minutes: int = Query(15, ge=1, le=120)):
+def api_generate_report(
+    incident_id: str,
+    time_window_minutes: int = Query(15, ge=1, le=120),
+    engine: Optional[str] = Query("auto", description="LLM Engine: auto, ollama, gemini, heuristic"),
+    model: Optional[str] = Query(None, description="Model identifier (e.g. llama3, llama3.2)"),
+):
     """Generates structured SOC incident report (What, Evidence, Severity, Action)."""
     alerts = get_alerts(limit=1000)
     incidents = correlate_alerts(alerts, time_window_minutes=time_window_minutes)
     incident = next((i for i in incidents if i["incident_id"] == incident_id), None)
     if not incident:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Incident '{incident_id}' not found.")
-    report_data = generate_incident_report(incident)
+    report_data = generate_incident_report(incident, engine=engine, model=model)
     if "incident_id" not in report_data:
         report_data["incident_id"] = incident_id
     return report_data
 
 
 @app.get("/incidents/{incident_id}/pdf")
-def api_export_pdf(incident_id: str, time_window_minutes: int = Query(15, ge=1, le=120)):
+def api_export_pdf(
+    incident_id: str,
+    time_window_minutes: int = Query(15, ge=1, le=120),
+    engine: Optional[str] = Query("auto", description="LLM Engine: auto, ollama, gemini, heuristic"),
+    model: Optional[str] = Query(None, description="Model identifier (e.g. llama3, llama3.2)"),
+):
     """Compiles and streams executive PDF document for the correlated incident."""
     alerts = get_alerts(limit=1000)
     incidents = correlate_alerts(alerts, time_window_minutes=time_window_minutes)
     incident = next((i for i in incidents if i["incident_id"] == incident_id), None)
     if not incident:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Incident '{incident_id}' not found.")
-    report_data = generate_incident_report(incident)
+    report_data = generate_incident_report(incident, engine=engine, model=model)
     pdf_bytes = export_report_to_pdf(incident, report_data)
     filename = f"Incident_Report_{incident_id}_{incident['src_ip']}.pdf"
     return Response(
