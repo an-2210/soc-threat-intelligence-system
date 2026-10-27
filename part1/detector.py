@@ -1,14 +1,15 @@
-"""Part 1: supervised classifier that turns network flows into alert JSON."""
-import argparse, json, random, time
+import argparse, json, os, random, time
 import datetime as dt
 import joblib, requests
 import pandas as pd
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+
 # ---- the one thing to change at final hookup: Part 3's address ----
-URL = "http://<dell-ip>:8000/alert"
+URL = "http://127.0.0.1:8000/alert"
 # --------------------------------------------------------------------
 
-bundle = joblib.load("models/rf_detector.joblib")
+bundle = joblib.load(os.path.join(HERE, "models", "rf_detector.joblib"))
 model, FEATURES = bundle["model"], bundle["features"]
 MEAN, STD = bundle["mean"], bundle["std"]
 IMPORTANCE = dict(zip(FEATURES, model.feature_importances_))
@@ -53,8 +54,10 @@ def send(alert, url, post):
         print("Could not reach dashboard:", e)
 
 
-def make_meta(row):
-    return {"src_ip": random.choice(SIMULATED_SOURCES), "dst_ip": "192.168.10.5", "dst_port": int(row["Destination Port"])}
+def make_meta(row, custom_src=None, custom_dst=None):
+    src = custom_src or (row["Source IP"] if "Source IP" in row else random.choice(SIMULATED_SOURCES))
+    dst = custom_dst or "192.168.10.5"
+    return {"src_ip": src, "dst_ip": dst, "dst_port": int(row["Destination Port"])}
 
 
 def detect(flows, metas, url=URL, post=False, delay=0.0):
@@ -74,14 +77,16 @@ def detect(flows, metas, url=URL, post=False, delay=0.0):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--flows", default="demo_flows.csv")
+    ap.add_argument("--flows", default=os.path.join(HERE, "demo_flows.csv"))
     ap.add_argument("--url", default=URL)
+    ap.add_argument("--src-ip", default=None, help="Custom source IP to assign to alerts (default: simulated)")
+    ap.add_argument("--dst-ip", default="192.168.10.5", help="Custom destination IP (default: 192.168.10.5)")
     ap.add_argument("--send", action="store_true", help="POST alerts to the URL (default: just print them)")
     ap.add_argument("--delay", type=float, default=0.0, help="seconds between alerts, for a live-looking demo")
     a = ap.parse_args()
 
     df = pd.read_csv(a.flows)
-    metas = [make_meta(df.iloc[i]) for i in range(len(df))]
+    metas = [make_meta(df.iloc[i], custom_src=a.src_ip, custom_dst=a.dst_ip) for i in range(len(df))]
     detect(df, metas, url=a.url, post=a.send, delay=a.delay)
     if "true_label" in df:  # evaluation only; the alerts above never see the label
         pred = model.predict(df[FEATURES])

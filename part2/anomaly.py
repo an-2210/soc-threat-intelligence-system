@@ -89,7 +89,7 @@ def send(alert, url, post):
         print("Could not reach dashboard:", e)
 
 
-def detect(flows, det, url=URL, post=False, delay=0.0):
+def detect(flows, det, url=URL, post=False, delay=0.0, custom_src=None, custom_dst=None):
     x = prep.transform(flows, det.bundle)
     scores = det.score(x)
     abnormal = det.abnormality(x)
@@ -100,9 +100,12 @@ def detect(flows, det, url=URL, post=False, delay=0.0):
             continue
         row = flows.iloc[i]
         top = [features[j] for j in np.argsort(-abnormal[i])[:TOP_K]]
-        src = row["Source IP"] if "Source IP" in row else random.choice(SIMULATED_SOURCES)
+        src = custom_src or (row["Source IP"] if "Source IP" in row else random.choice(SIMULATED_SOURCES))
         conf = prep.confidence(scores[i], det.grid)
-        send(build_alert(row, scores[i], conf, src, top), url, post)
+        alert = build_alert(row, scores[i], conf, src, top)
+        if custom_dst:
+            alert["dst_ip"] = custom_dst
+        send(alert, url, post)
         n += 1
         if delay:
             time.sleep(delay)
@@ -114,8 +117,10 @@ if __name__ == "__main__":
     ap.add_argument("--flows", default=os.path.join(HERE, "demo_flows.csv"))
     ap.add_argument("--model", choices=["autoencoder", "iforest"], default="autoencoder")
     ap.add_argument("--url", default=URL)
+    ap.add_argument("--src-ip", default=None, help="Custom source IP to assign to alerts (default: simulated)")
+    ap.add_argument("--dst-ip", default=None, help="Custom destination IP (default: 192.168.10.5)")
     ap.add_argument("--send", action="store_true", help="POST alerts to the URL (default: just print them)")
     ap.add_argument("--delay", type=float, default=0.0, help="seconds between alerts, for a live-looking demo")
     a = ap.parse_args()
 
-    detect(load_flows(a.flows), Detector(a.model), url=a.url, post=a.send, delay=a.delay)
+    detect(load_flows(a.flows), Detector(a.model), url=a.url, post=a.send, delay=a.delay, custom_src=a.src_ip, custom_dst=a.dst_ip)

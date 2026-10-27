@@ -159,6 +159,7 @@ def dispatch(alert: dict, url: str, dry_run: bool):
 def main():
     parser = argparse.ArgumentParser(description="Generate mock IDS alerts and send to Part 3 SOC Receiver.")
     parser.add_argument("--url", default="http://127.0.0.1:8000/alert", help="Receiver POST endpoint")
+    parser.add_argument("--src-ip", default=None, help="Custom attacker/source IP for generated alerts")
     parser.add_argument("--count", type=int, default=15, help="Number of random alerts to send (0 to disable)")
     parser.add_argument("--delay", type=float, default=0.2, help="Delay between alerts in seconds")
     parser.add_argument("--campaign", action="store_true", help="Run a realistic multi-stage kill-chain campaign")
@@ -174,7 +175,7 @@ def main():
     sent = 0
     try:
         while True:
-            alert = generate_alert()
+            alert = generate_alert(attacker_ip=args.src_ip)
             dispatch(alert, args.url, args.dry_run)
             sent += 1
             if not args.loop and sent >= args.count:
