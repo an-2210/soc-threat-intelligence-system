@@ -49,3 +49,6 @@ yarn-error.log*
 # Environment
 .env
 *.local
+
+# VTOP Submissions
+submission/

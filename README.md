@@ -94,6 +94,21 @@ cnproj/
     │
     └── tests/
         └── test_soc_cti.py            # Comprehensive 30-test pytest suite
+│
+├── docs/                              # Project documentation & presentation
+│   ├── ML_Powered_Intrusion_Detector_Report.pdf # Comprehensive 15-page project report
+│   └── Project_Presentation.pptx     # Review presentation slide deck
+│
+├── screenshots/                       # High-resolution dashboard and ML verification screenshots
+│   ├── 01_System_Architecture.png
+│   ├── 02_Incident_Reports_and_PDF.png
+│   ├── 03_Security_Check_Syslog_Parser.png
+│   ├── 04_Supervised_Confusion_Matrices.png
+│   ├── 05_Feature_Importance.png
+│   └── 06_Zero_Day_ROC_Curves.png
+│
+└── simulation/                        # Network simulation files
+    └── network_topology.pkt           # Cisco Packet Tracer network simulation topology
 ```
 
 ---
@@ -245,3 +260,18 @@ python part3/mock_alerts.py --campaign --delay 0.3
 # Continuous live streaming simulation
 python part3/mock_alerts.py --loop --delay 0.5
 ```
+
+---
+
+## Project Verification & Submission Checklist (Assignment 10)
+
+| Requirement | Location / Artifact | Verification Status |
+|---|---|:---:|
+| **1. Complete Project Source Code** | `part1/`, `part2/`, `part3/` (Backend + React Frontend) | ✅ Verified (VS Code / Python / Vite) |
+| **2. Network Simulation Files** | `simulation/network_topology.pkt` | ✅ Verified (Cisco Packet Tracer) |
+| **3. Dashboard Screenshots** | `screenshots/` (6 high-resolution architecture & UI captures) | ✅ Verified |
+| **4. Database & Models** | `part3/alerts.db`, `part1/models/`, `part2/models/` | ✅ Verified (166+ stored telemetry flows) |
+| **5. Configuration & Requirements** | `requirements.txt`, `package.json`, `vite.config.js` | ✅ Verified |
+| **6. Project Report & Presentation** | `docs/ML_Powered_Intrusion_Detector_Report.pdf`, `docs/Project_Presentation.pptx` | ✅ Verified (15-page IEEE report) |
+| **7. Automated Test Suite** | `pytest part3/tests/test_soc_cti.py -v` (30/30 passed) | ✅ Verified (100% test pass rate) |
+| **8. Prescribed File Naming** | `<Slot>_<Team>_*` package generator script | ✅ Automated via `scripts/package_submission.py` |
