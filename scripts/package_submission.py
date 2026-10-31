@@ -23,21 +23,21 @@ def package(slot: str, team: str, out_dir: str = None):
     print(f"[*] Target Directory: {target_dir}\n")
 
     # 1. Report PDF
-    report_src = os.path.join(ROOT, "docs", "ML_Powered_Intrusion_Detector_Report.pdf")
+    report_src = os.path.join(ROOT, "docs", "F2_Team27_Report.pdf")
     if os.path.exists(report_src):
         dst = os.path.join(target_dir, f"{prefix}_Report.pdf")
         shutil.copy2(report_src, dst)
         print(f"  [OK] {os.path.basename(dst)} (Project Report)")
 
     # 2. Presentation PPT
-    ppt_src = os.path.join(ROOT, "docs", "Project_Presentation.pptx")
+    ppt_src = os.path.join(ROOT, "docs", "F2_Team27_PPT.pptx")
     if os.path.exists(ppt_src):
         dst = os.path.join(target_dir, f"{prefix}_PPT.pptx")
         shutil.copy2(ppt_src, dst)
         print(f"  [OK] {os.path.basename(dst)} (Presentation Slides)")
 
     # 3. Cisco Packet Tracer Simulation (.pkt)
-    pkt_src = os.path.join(ROOT, "simulation", "network_topology.pkt")
+    pkt_src = os.path.join(ROOT, "simulation", "F2_Team27_Simulation.pkt")
     if os.path.exists(pkt_src):
         dst = os.path.join(target_dir, f"{prefix}_Simulation.pkt")
         shutil.copy2(pkt_src, dst)
